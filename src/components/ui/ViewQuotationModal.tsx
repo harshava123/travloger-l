@@ -54,124 +54,124 @@ const ViewQuotationModal: React.FC<ViewQuotationModalProps> = ({
   const [loading, setLoading] = useState(false)
 
   // Sample data structure - replace with actual API calls
-  const sampleQuotationData: QuotationData = {
-    queryId: "100045",
-    customerName: "Gajanand",
-    destination: "Kerala",
-    adults: 2,
-    children: 0,
-    nights: 4,
-    days: 5,
-    startDate: "Mon, 27 Oct, 2025",
-    endDate: "Wed, 29 Oct, 2025",
-    queryDate: "10-Oct-2025",
-    totalPrice: 16654,
-    hotels: [
-      {
-        city: "Munnar",
-        hotelName: "June Boutique Villa (3 Star)",
-        checkIn: "28-Oct-2025",
-        checkOut: "30-Oct-2025",
-        nights: 2,
-        roomType: "Deluxe Balcony Room",
-        mealPlan: "CP",
-        rooms: 1
-      }
-    ],
-    itinerary: [
-      {
-        day: 1,
-        date: "27 Oct 2025",
-        title: "Cochin to Munnar",
-        description: "Transfer from Cochin to Munnar (4.5 Hours)",
-        activities: [
-          "Arrival at Cochin International Airport by 9 AM",
-          "Scenic drive to Munnar",
-          "Stop at Neriamangalam Bridge for views of Periyar Lake",
-          "Visit Cheeyappara and Valara Waterfalls",
-          "Experience ziplining and a fish spa at Pottas Fun Farm",
-          "Optional visit to Punarjani Traditional Village for Kathakali and martial arts performances",
-          "Check into Munnar hotel",
-          "Unwind for a restful night"
-        ]
-      },
-      {
-        day: 2,
-        date: "28 Oct 2025",
-        title: "Munnar Local Sightseeing",
-        description: "Munnar Sightseeing | With TOP STATION",
-        activities: [
-          "After breakfast, leave the hotel by 9 AM",
-          "Visit Photo Point and Echo Point",
-          "Experience jet-skiing at Matupetty Dam",
-          "Visit Pullu Medu Elephant Viewpoint for wild elephants",
-          "Continue to Yellapatty Grasslands (highlight of the tour)",
-          "Ascend to Top Station for panoramic views of the Munnar landscape",
-          "Overnight stay in Munnar"
-        ]
-      },
-      {
-        day: 3,
-        date: "29 Oct 2025",
-        title: "Munnar to Cochin",
-        description: "Bid farewell to God's Own Country",
-        activities: [
-          "Beautiful sunrise, breakfast, and post-out from the hotel",
-          "Transferred to Kochi Airport/Railway Station/Bus Stand",
-          "More sightseeing options depending on flight timing",
-          "Mattancherry—the Dutch Palace",
-          "Paradesi Synagogue (ancient chandeliers)",
-          "Fort Cochin—St. Francis Church (India's oldest European church)",
-          "Santa Cruz Basilica",
-          "Chinese Fishing Nets",
-          "Views of MARINE Drive"
-        ]
-      }
-    ],
-    inclusions: [
-      "Airport/Railway/Bus stop pick-up & drop",
-      "Entire travel as per the itinerary in a private vehicle",
-      "(Sedan/SUV/MUV/Tempo Traveller)",
-      "Enter sightseeing as per the mentioned itinerary only",
-      "Driver come guide",
-      "All Permits, Tolls & Taxes",
-      "Fuel expenses & Driver allowances"
-    ],
-    exclusions: [
-      "To and from fares of airlines/buses/railways",
-      "Entry Fee/Camera Fee/Activities/Rides not mentioned",
-      "Any kind of food or beverage that is not included in the package, like alcoholic drinks, mineral water, meals/refreshments/lunches on the go"
-    ],
-    terms: [
-      "Driver duty time will only be 8 AM to 7 PM, except for pick up",
-      "Driver Extra time service according to the location of hotels and will be charged ₹250/- per hour",
-      "Early morning pickups are only possible after 6 am",
-      "The provided quotation is based on the specific itinerary discussed. Any extra kilometers or stops will incur extra charges, payable directly to the driver",
-      "The Air conditioning in the room will not cool suddenly like in homes and hotels. It will take 30 minutes to 1 hour to be in full power",
-      "The guest must go to the bedroom by 10 PM. It is not allowed to be outside after 10 PM",
-      "A presence of flies and small insects is the natural habitat. It cannot be 100% eliminated",
-      "Management will not be liable for missing things during the trip",
-      "Please pack light, as we aim to travel minimally. Our itinerary is subject to change due to weather, road conditions, participant abilities, and other unforeseen circumstances",
-      "We don't permit smoking during the movement in transport",
-      "Travloger reserves the right to end your trip at any time due to inappropriate behavior/conduct. In such cases, no refunds will be issued",
-      "The individual reserving the spot is liable for any harm caused to room/camp/resort outfitting and is responsible to pay for something similar",
-      "If any sightseeing is cancelled due to bad weather conditions or unavoidable circumstances, no refund will be given",
-      "Provided rates are subject to change based on availability/changes in Hotels, fuel rates, etc."
-    ],
-    cancellationPolicy: [
-      "No refund shall be made with respect to the initial booking advance amount for any cancellations",
-      "If cancellations are made 2015 days before the start date of the trip, 50% of the trip cost will be charged as cancellation fees",
-      "If cancellations are made 15–7 days before the start date of the trip, 50% of the trip cost will be charged as cancellation fees",
-      "If cancellations are made within 7 days before the start date of the trip, 75% of the trip cost will be charged as cancellation fees",
-      "In the case of unforeseen weather conditions or government restrictions, certain activities may be cancelled, and in such cases, the operator will try his best to provide an alternate feasible activity. However, no refund will be provided for the same"
-    ],
-    usefulTips: [
-      "Ensure that you know your preferred destination, activities, travel dates, and budget. This will help us recommend the best package for your needs",
-      "Double-check what's covered in the package—flights, accommodations, meals, tours, and transfers—so there are no surprises later",
-      "Be aware of cancellation or modification fees. Make sure you're comfortable with the flexibility offered in case of unexpected changes",
-      "Inquire about any optional activities, resort fees, taxes, or tips that may not be included in the package price"
-    ]
-  }
+  // const sampleQuotationData: QuotationData = {
+  //   queryId: "100045",
+  //   customerName: "Gajanand",
+  //   destination: "Kerala",
+  //   adults: 2,
+  //   children: 0,
+  //   nights: 4,
+  //   days: 5,
+  //   startDate: "Mon, 27 Oct, 2025",
+  //   endDate: "Wed, 29 Oct, 2025",
+  //   queryDate: "10-Oct-2025",
+  //   totalPrice: 16654,
+  //   hotels: [
+  //     {
+  //       city: "Munnar",
+  //       hotelName: "June Boutique Villa (3 Star)",
+  //       checkIn: "28-Oct-2025",
+  //       checkOut: "30-Oct-2025",
+  //       nights: 2,
+  //       roomType: "Deluxe Balcony Room",
+  //       mealPlan: "CP",
+  //       rooms: 1
+  //     }
+  //   ],
+  //   itinerary: [
+  //     {
+  //       day: 1,
+  //       date: "27 Oct 2025",
+  //       title: "Cochin to Munnar",
+  //       description: "Transfer from Cochin to Munnar (4.5 Hours)",
+  //       activities: [
+  //         "Arrival at Cochin International Airport by 9 AM",
+  //         "Scenic drive to Munnar",
+  //         "Stop at Neriamangalam Bridge for views of Periyar Lake",
+  //         "Visit Cheeyappara and Valara Waterfalls",
+  //         "Experience ziplining and a fish spa at Pottas Fun Farm",
+  //         "Optional visit to Punarjani Traditional Village for Kathakali and martial arts performances",
+  //         "Check into Munnar hotel",
+  //         "Unwind for a restful night"
+  //       ]
+  //     },
+  //     {
+  //       day: 2,
+  //       date: "28 Oct 2025",
+  //       title: "Munnar Local Sightseeing",
+  //       description: "Munnar Sightseeing | With TOP STATION",
+  //       activities: [
+  //         "After breakfast, leave the hotel by 9 AM",
+  //         "Visit Photo Point and Echo Point",
+  //         "Experience jet-skiing at Matupetty Dam",
+  //         "Visit Pullu Medu Elephant Viewpoint for wild elephants",
+  //         "Continue to Yellapatty Grasslands (highlight of the tour)",
+  //         "Ascend to Top Station for panoramic views of the Munnar landscape",
+  //         "Overnight stay in Munnar"
+  //       ]
+  //     },
+  //     {
+  //       day: 3,
+  //       date: "29 Oct 2025",
+  //       title: "Munnar to Cochin",
+  //       description: "Bid farewell to God's Own Country",
+  //       activities: [
+  //         "Beautiful sunrise, breakfast, and post-out from the hotel",
+  //         "Transferred to Kochi Airport/Railway Station/Bus Stand",
+  //         "More sightseeing options depending on flight timing",
+  //         "Mattancherry—the Dutch Palace",
+  //         "Paradesi Synagogue (ancient chandeliers)",
+  //         "Fort Cochin—St. Francis Church (India's oldest European church)",
+  //         "Santa Cruz Basilica",
+  //         "Chinese Fishing Nets",
+  //         "Views of MARINE Drive"
+  //       ]
+  //     }
+  //   ],
+  //   inclusions: [
+  //     "Airport/Railway/Bus stop pick-up & drop",
+  //     "Entire travel as per the itinerary in a private vehicle",
+  //     "(Sedan/SUV/MUV/Tempo Traveller)",
+  //     "Enter sightseeing as per the mentioned itinerary only",
+  //     "Driver come guide",
+  //     "All Permits, Tolls & Taxes",
+  //     "Fuel expenses & Driver allowances"
+  //   ],
+  //   exclusions: [
+  //     "To and from fares of airlines/buses/railways",
+  //     "Entry Fee/Camera Fee/Activities/Rides not mentioned",
+  //     "Any kind of food or beverage that is not included in the package, like alcoholic drinks, mineral water, meals/refreshments/lunches on the go"
+  //   ],
+  //   terms: [
+  //     "Driver duty time will only be 8 AM to 7 PM, except for pick up",
+  //     "Driver Extra time service according to the location of hotels and will be charged ₹250/- per hour",
+  //     "Early morning pickups are only possible after 6 am",
+  //     "The provided quotation is based on the specific itinerary discussed. Any extra kilometers or stops will incur extra charges, payable directly to the driver",
+  //     "The Air conditioning in the room will not cool suddenly like in homes and hotels. It will take 30 minutes to 1 hour to be in full power",
+  //     "The guest must go to the bedroom by 10 PM. It is not allowed to be outside after 10 PM",
+  //     "A presence of flies and small insects is the natural habitat. It cannot be 100% eliminated",
+  //     "Management will not be liable for missing things during the trip",
+  //     "Please pack light, as we aim to travel minimally. Our itinerary is subject to change due to weather, road conditions, participant abilities, and other unforeseen circumstances",
+  //     "We don't permit smoking during the movement in transport",
+  //     "Travloger reserves the right to end your trip at any time due to inappropriate behavior/conduct. In such cases, no refunds will be issued",
+  //     "The individual reserving the spot is liable for any harm caused to room/camp/resort outfitting and is responsible to pay for something similar",
+  //     "If any sightseeing is cancelled due to bad weather conditions or unavoidable circumstances, no refund will be given",
+  //     "Provided rates are subject to change based on availability/changes in Hotels, fuel rates, etc."
+  //   ],
+  //   cancellationPolicy: [
+  //     "No refund shall be made with respect to the initial booking advance amount for any cancellations",
+  //     "If cancellations are made 2015 days before the start date of the trip, 50% of the trip cost will be charged as cancellation fees",
+  //     "If cancellations are made 15–7 days before the start date of the trip, 50% of the trip cost will be charged as cancellation fees",
+  //     "If cancellations are made within 7 days before the start date of the trip, 75% of the trip cost will be charged as cancellation fees",
+  //     "In the case of unforeseen weather conditions or government restrictions, certain activities may be cancelled, and in such cases, the operator will try his best to provide an alternate feasible activity. However, no refund will be provided for the same"
+  //   ],
+  //   usefulTips: [
+  //     "Ensure that you know your preferred destination, activities, travel dates, and budget. This will help us recommend the best package for your needs",
+  //     "Double-check what's covered in the package—flights, accommodations, meals, tours, and transfers—so there are no surprises later",
+  //     "Be aware of cancellation or modification fees. Make sure you're comfortable with the flexibility offered in case of unexpected changes",
+  //     "Inquire about any optional activities, resort fees, taxes, or tips that may not be included in the package price"
+  //   ]
+  // }
 
   useEffect(() => {
     if (isOpen && itineraryId) {
