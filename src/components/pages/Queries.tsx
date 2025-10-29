@@ -37,6 +37,35 @@ const Queries: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const [selectedQueries, setSelectedQueries] = useState<number[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string; email: string }>>([])
+  const [loadingEmployees, setLoadingEmployees] = useState<boolean>(false)
+
+  // Fetch employees data
+  const fetchEmployees = useCallback(async (destination?: string) => {
+    setLoadingEmployees(true)
+    try {
+      const url = destination ? `/api/employees?destination=${encodeURIComponent(destination)}` : '/api/employees'
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        setEmployees((data.employees || []).map((e: any) => ({ 
+          id: String(e.id), 
+          name: e.name, 
+          email: e.email 
+        })))
+      } else {
+        setEmployees([])
+      }
+    } catch (_) {
+      setEmployees([])
+    } finally {
+      setLoadingEmployees(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchEmployees()
+  }, [fetchEmployees])
 
   // Fetch queries data
   const fetchQueries = useCallback(async () => {
@@ -152,28 +181,51 @@ const Queries: React.FC = () => {
   // Handle assignment update
   const handleAssignmentUpdate = async (queryId: number, employeeName: string) => {
     try {
-      const response = await fetch(`/api/leads?id=${queryId}`, {
-        method: 'PATCH',
+      // Find the employee by name to get their email
+      const employee = employees.find(emp => emp.name === employeeName)
+      if (!employee && employeeName) {
+        console.error('Employee not found')
+        return
+      }
+
+      const response = await fetch('/api/leads/assign', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          assigned_employee_name: employeeName,
-          last_updated: new Date().toISOString()
+          leadId: queryId,
+          employeeId: employee?.id || '',
+          employeeName: employee?.name || '',
+          employeeEmail: employee?.email || ''
         }),
       })
 
       if (response.ok) {
+        // Update the query in the local state
         setQueries(prev => prev.map(q => 
           q.id === queryId 
-            ? { ...q, assigned_employee_name: employeeName, last_updated: new Date().toISOString() }
+            ? { 
+                ...q, 
+                assigned_employee_name: employee?.name || '',
+                last_updated: new Date().toISOString()
+              }
             : q
         ))
+        
+        // Show success message
+        if (employee) {
+          alert(`Successfully assigned query to ${employee.name}. Emails have been sent with relevant details.`)
+        } else {
+          alert('Query has been unassigned.')
+        }
       } else {
-        console.error('Failed to update query assignment')
+        const err = await response.json().catch(() => ({}))
+        alert(err.error || 'Failed to update query assignment')
       }
     } catch (error) {
       console.error('Error updating query assignment:', error)
+      alert('Failed to update query assignment')
     }
   }
 
@@ -305,14 +357,25 @@ const Queries: React.FC = () => {
                         </div>
                         <div className="text-xs text-gray-500 ml-4 mb-1">Till 14-11-2025</div>
                         <div className="text-xs text-gray-500">Assigned to</div>
-                        <Select 
-                          value={typeof query.assigned_employee_name === 'string' ? query.assigned_employee_name : query.assigned_employee_name?.toString() || 'Assign to me'}
-                          onChange={(e) => handleAssignmentUpdate(query.id, (e.target as HTMLSelectElement).value)}
-                          className="h-4 px-1 text-xs font-medium text-blue-700 bg-white border border-gray-300 rounded"
-                        >
-                          <option value="Assign to me">Assign to me</option>
-                          <option value="Unassigned">Unassigned</option>
-                        </Select>
+                        {loadingEmployees ? (
+                          <div className="flex items-center space-x-1 h-4">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                            <span className="text-xs text-gray-500">Loading...</span>
+                          </div>
+                        ) : (
+                          <Select 
+                            value={query.assigned_employee_name || ''}
+                            onChange={(e) => handleAssignmentUpdate(query.id, (e.target as HTMLSelectElement).value)}
+                            className="h-4 px-1 text-xs font-medium text-blue-700 bg-white border border-gray-300 rounded"
+                          >
+                            <option value="">Assign to...</option>
+                            {employees.map(emp => (
+                              <option key={emp.id} value={emp.name}>
+                                {emp.name}
+                              </option>
+                            ))}
+                          </Select>
+                        )}
                       </div>
 
                       {/* Tasks & Notes */}

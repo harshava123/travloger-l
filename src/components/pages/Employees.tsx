@@ -28,6 +28,8 @@ const Employees: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false)
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<boolean>(false)
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -251,8 +253,24 @@ const Employees: React.FC = () => {
     const normalizedEmail = (editingEmployee.email || '').trim().toLowerCase()
     const normalizedPhone = (editingEmployee.phone || '').trim()
 
-    // Skip pre-check; rely on DB unique constraint for phone
+    // Check if phone number already exists
+    const { data: existingEmployee, error: checkError } = await supabase
+      .from('employees')
+      .select('id, name')
+      .eq('phone', normalizedPhone)
+      .neq('id', editingEmployee.id) // Exclude current employee
+      .single()
 
+    if (existingEmployee) {
+      alert(`Phone number ${normalizedPhone} is already registered to employee: ${existingEmployee.name}`)
+      return
+    }
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+      alert(`Error checking phone number: ${checkError.message}`)
+      return
+    }
+    
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -270,7 +288,11 @@ const Employees: React.FC = () => {
 
       if (error) {
         const msg = error.message || ''
-        alert(`Failed to update employee: ${msg}`)
+        if (msg.includes('duplicate key value violates unique constraint "employees_phone_key"')) {
+          alert(`Phone number ${normalizedPhone} is already registered to another employee. Please use a different phone number.`)
+        } else {
+          alert(`Failed to update employee: ${msg}`)
+        }
         return
       }
 
@@ -292,11 +314,11 @@ const Employees: React.FC = () => {
         
         setShowEditModal(false)
         setEditingEmployee(null)
-        alert('Employee updated successfully!')
+        setSuccessMessage('Employee updated successfully!')
       }
     } catch (error) {
       console.error('Error updating employee:', error)
-      alert('Failed to update employee. Please try again.')
+      setErrorMessage('Failed to update employee. Please try again.')
     }
   }
 
@@ -368,7 +390,22 @@ const Employees: React.FC = () => {
     const normalizedEmail = (newEmployee.email || '').trim().toLowerCase()
     const normalizedPhone = (newEmployee.phone || '').trim()
     
-    // Skip pre-check; rely on DB unique constraint for phone
+    // Check if phone number already exists
+    const { data: existingEmployee, error: checkError } = await supabase
+      .from('employees')
+      .select('id, name')
+      .eq('phone', normalizedPhone)
+      .single()
+
+    if (existingEmployee) {
+      alert(`Phone number ${normalizedPhone} is already registered to employee: ${existingEmployee.name}`)
+      return
+    }
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+      alert(`Error checking phone number: ${checkError.message}`)
+      return
+    }
     
     const passwordHash = await bcrypt.hash(newEmployee.password, 10)
 
@@ -391,7 +428,11 @@ const Employees: React.FC = () => {
     
     if (error) {
       const msg = error.message || ''
-      alert(`Failed to save employee: ${msg}`)
+      if (msg.includes('duplicate key value violates unique constraint "employees_phone_key"')) {
+        setErrorMessage(`Phone number ${normalizedPhone} is already registered to another employee. Please use a different phone number.`)
+      } else {
+        setErrorMessage(`Failed to save employee: ${msg}`)
+      }
       return
     }
 
@@ -466,9 +507,9 @@ const Employees: React.FC = () => {
         setNewEmployee({ name: '', email: '', phone: '', destination: '', password: '' })
         
         if (emailResult.success) {
-          alert('Employee created successfully! Credentials have been sent to their email.')
-        } else {
-          alert('Employee created successfully! However, there was an issue sending the email. Please share credentials manually.')
+        setSuccessMessage('Employee created successfully! Credentials have been sent to their email.')
+      } else {
+        setSuccessMessage('Employee created successfully! However, there was an issue sending the email. Please share credentials manually.')
         }
       } catch (emailError) {
         console.error('Email sending error:', emailError)
@@ -718,6 +759,62 @@ const Employees: React.FC = () => {
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(85vh-120px)]">
+              {/* Error/Success Messages */}
+              {errorMessage && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700">{errorMessage}</p>
+                    </div>
+                    <div className="ml-auto pl-3">
+                      <div className="-mx-1.5 -my-1.5">
+                        <button
+                          onClick={() => setErrorMessage(null)}
+                          className="inline-flex rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none"
+                        >
+                          <span className="sr-only">Dismiss</span>
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-700">{successMessage}</p>
+                    </div>
+                    <div className="ml-auto pl-3">
+                      <div className="-mx-1.5 -my-1.5">
+                        <button
+                          onClick={() => setSuccessMessage(null)}
+                          className="inline-flex rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none"
+                        >
+                          <span className="sr-only">Dismiss</span>
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Basic Information */}
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-1">

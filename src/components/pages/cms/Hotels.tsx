@@ -3,11 +3,14 @@ import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card'
 import { Badge } from '../../ui/badge'
-import { Plus, Search, Edit, Trash2, ArrowLeft, Download, Upload, FileDown, Star } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ArrowLeft, Download, Upload, FileDown, Star, MoreVertical } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { fetchApi, handleApiError } from '../../../lib/api'
+import Image from 'next/image'
+import ErrorBoundary from '../../ErrorBoundary'
 
 interface Hotel {
-  id: number
+  id: string
   name: string
   category: number
   destination: string
@@ -19,6 +22,23 @@ interface Hotel {
   status: string
   created_by: string
   date: string
+}
+
+interface HotelRate {
+  id: number
+  hotel_id: string
+  from_date: string
+  to_date: string
+  from_date_formatted: string
+  to_date_formatted: string
+  room_type: string
+  meal_plan: string
+  single: number
+  double: number
+  triple: number
+  quad: number
+  cwb: number
+  cnb: number
 }
 
 const Hotels: React.FC = () => {
@@ -49,6 +69,30 @@ const Hotels: React.FC = () => {
   const [destinationInput, setDestinationInput] = useState('')
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false)
 
+  // Rate management states
+  const [showRateDialog, setShowRateDialog] = useState(false)
+  const [currentHotel, setCurrentHotel] = useState<Hotel | null>(null)
+  const [rates, setRates] = useState<HotelRate[]>([])
+  const [roomTypes, setRoomTypes] = useState<{id: number, name: string}[]>([])
+  const [mealPlans, setMealPlans] = useState<string[]>([])
+  const [loadingRates, setLoadingRates] = useState(false)
+  const [rateError, setRateError] = useState<string | null>(null)
+  const [rateMenuOpen, setRateMenuOpen] = useState<number | null>(null)
+
+  const [rateForm, setRateForm] = useState({
+    fromDate: '',
+    toDate: '',
+    roomType: '',
+    mealPlan: 'APAI',
+    single: '',
+    double: '',
+    triple: '',
+    quad: '',
+    cwb: '',
+    cnb: ''
+  })
+  const [editingRate, setEditingRate] = useState<HotelRate | null>(null)
+
   // Convert file to base64
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -72,116 +116,93 @@ const Hotels: React.FC = () => {
 
   const fetchDestinations = async () => {
     try {
-      const response = await fetch('/api/destinations')
-      const data = await response.json()
-      
-      if (response.ok) {
-        setDestinations(data.destinations?.map((d: any) => d.name) || [])
-      }
+      const data = await fetchApi('/api/destinations');
+      setDestinations(data.destinations?.map((d: any) => d.name) || []);
     } catch (error) {
-      console.error('Error fetching destinations:', error)
+      console.error('Error fetching destinations:', handleApiError(error));
     }
   }
 
   const fetchHotels = async () => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/hotels')
-      const data = await response.json()
-      
-      if (response.ok) {
-        setHotels(data.hotels || [])
-      } else {
-        console.error('Failed to fetch hotels:', data.error)
-      }
+      setLoading(true);
+      const data = await fetchApi('/api/hotels');
+      setHotels(data.hotels || []);
     } catch (error) {
-      console.error('Error fetching hotels:', error)
+      console.error('Error fetching hotels:', handleApiError(error));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const handleSaveHotel = async () => {
     if (!formData.name.trim() || !formData.destination.trim()) {
-      alert('Please fill in all required fields')
-      return
+      alert('Please fill in all required fields');
+      return;
     }
 
     // Photo is required for new hotels, optional for updates
     if (!selectedFile && !editingHotel) {
-      alert('Please select a hotel photo')
-      return
+      alert('Please select a hotel photo');
+      return;
     }
 
     try {
-      setSaving(true)
-      const method = editingHotel ? 'PUT' : 'POST'
+      setSaving(true);
+      const method = editingHotel ? 'PUT' : 'POST';
       
       let body = editingHotel 
         ? { id: editingHotel.id, ...formData }
-        : formData
+        : formData;
       
       // Convert selected file to base64 if provided
       if (selectedFile) {
         try {
-          const base64String = await convertFileToBase64(selectedFile)
-          body.iconUrl = base64String
-          console.log('✅ File converted to base64:', selectedFile.name)
+          const base64String = await convertFileToBase64(selectedFile);
+          body.iconUrl = base64String;
+          console.log('✅ File converted to base64:', selectedFile.name);
         } catch (error) {
-          console.error('❌ Error converting file to base64:', error)
-          alert('Error processing the image file. Please try again.')
-          return
+          console.error('❌ Error converting file to base64:', error);
+          alert('Error processing the image file. Please try again.');
+          return;
         }
       }
 
-      const response = await fetch('/api/hotels', {
+      const data = await fetchApi('/api/hotels', {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      })
+      });
 
-      const data = await response.json()
-
-      if (response.ok) {
-        await fetchHotels() // Refresh the list
-        setShowAddForm(false)
-        setFormData({ name: '', destination: '', category: 3, price: 0, address: '', phone: '', email: '', iconUrl: '', status: 'Active' })
-        setEditingHotel(null)
-        setSelectedFile(null)
-        setFileName('')
-        alert(data.message || 'Hotel saved successfully')
-      } else {
-        alert(data.error || 'Failed to save hotel')
-      }
+      await fetchHotels(); // Refresh the list
+      setShowAddForm(false);
+      setFormData({ name: '', destination: '', category: 3, price: 0, address: '', phone: '', email: '', iconUrl: '', status: 'Active' });
+      setEditingHotel(null);
+      setSelectedFile(null);
+      setFileName('');
+      alert(data.message || 'Hotel saved successfully');
     } catch (error) {
-      console.error('Error saving hotel:', error)
-      alert('Error saving hotel')
+      console.error('Error saving hotel:', handleApiError(error));
+      alert(handleApiError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  const handleDeleteHotel = async (id: number, name: string) => {
+  const handleDeleteHotel = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-      return
+      return;
     }
 
     try {
-      const response = await fetch(`/api/hotels?id=${id}`, {
+      const data = await fetchApi(`/api/hotels?id=${id}`, {
         method: 'DELETE'
-      })
+      });
 
-      const data = await response.json()
-
-      if (response.ok) {
-        await fetchHotels() // Refresh the list
-        alert(data.message || 'Hotel deleted successfully')
-      } else {
-        alert(data.error || 'Failed to delete hotel')
-      }
+      await fetchHotels(); // Refresh the list
+      alert(data.message || 'Hotel deleted successfully');
     } catch (error) {
-      console.error('Error deleting hotel:', error)
-      alert('Error deleting hotel')
+      console.error('Error deleting hotel:', handleApiError(error));
+      alert(handleApiError(error));
     }
   }
 
@@ -232,6 +253,168 @@ const Hotels: React.FC = () => {
     setShowDestinationSuggestions(false)
     setSelectedFile(null)
     setFileName('')
+  }
+
+  // Rate management functions
+  const fetchRoomTypes = async () => {
+    try {
+      const data = await fetchApi('/api/room-types');
+      setRoomTypes(data.roomTypes || []);
+    } catch (error) {
+      console.error('Error fetching room types:', handleApiError(error));
+    }
+  }
+
+  const fetchMealPlans = async () => {
+    try {
+      const data = await fetchApi('/api/meal-plans');
+      const uniqueMealPlans = [...new Set((data.mealPlans || []).map((mp: any) => mp.meal_type))] as string[];
+      setMealPlans(uniqueMealPlans);
+    } catch (error) {
+      console.error('Error fetching meal plans:', handleApiError(error));
+    }
+  }
+
+  const openRateDialog = async (hotel: Hotel) => {
+    try {
+      setCurrentHotel(hotel);
+      setShowRateDialog(true);
+      setRateError(null);
+      await Promise.all([
+        fetchRoomTypes(),
+        fetchMealPlans(),
+        fetchRates(hotel.id)
+      ]);
+    } catch (error) {
+      setRateError(handleApiError(error));
+    }
+  }
+
+  const fetchRates = async (hotelId: string) => {
+    try {
+      setLoadingRates(true);
+      console.log('🔄 Fetching rates for hotel:', hotelId);
+      const data = await fetchApi(`/api/hotel-rates?hotelId=${hotelId}`);
+      console.log('✅ Rates fetched successfully:', data.rates);
+      setRates(data.rates || []);
+      console.log('✅ Rates state updated with', data.rates?.length || 0, 'rates');
+    } catch (error) {
+      console.error('❌ Error fetching rates:', handleApiError(error));
+    } finally {
+      setLoadingRates(false);
+    }
+  }
+
+  const handleAddRate = async () => {
+    if (!currentHotel || !rateForm.fromDate || !rateForm.toDate || !rateForm.roomType) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const body = {
+        hotelId: currentHotel.id,
+        fromDate: rateForm.fromDate,
+        toDate: rateForm.toDate,
+        roomType: rateForm.roomType,
+        mealPlan: rateForm.mealPlan,
+        single: parseFloat(rateForm.single) || 0,
+        double: parseFloat(rateForm.double) || 0,
+        triple: parseFloat(rateForm.triple) || 0,
+        quad: parseFloat(rateForm.quad) || 0,
+        cwb: parseFloat(rateForm.cwb) || 0,
+        cnb: parseFloat(rateForm.cnb) || 0
+      };
+
+      console.log('💾 Saving rate with data:', body);
+
+      const method = editingRate ? 'PUT' : 'POST';
+      const url = '/api/hotel-rates';
+
+      const data = await fetchApi(url, {
+        method,
+        body: JSON.stringify(editingRate ? { id: editingRate.id, ...body } : body)
+      });
+
+      console.log('✅ Rate saved successfully! Refreshing rates list...');
+      if (currentHotel) {
+        await fetchRates(currentHotel.id);
+      }
+      setRateForm({
+        fromDate: '',
+        toDate: '',
+        roomType: '',
+        mealPlan: 'APAI',
+        single: '',
+        double: '',
+        triple: '',
+        quad: '',
+        cwb: '',
+        cnb: ''
+      });
+      setEditingRate(null);
+      console.log('✅ Form cleared, rates should now be visible in table');
+    } catch (error) {
+      console.error('❌ Error saving rate:', handleApiError(error));
+      alert(handleApiError(error));
+    }
+  }
+
+  const handleDeleteRate = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this rate?')) {
+      return;
+    }
+
+    try {
+      await fetchApi(`/api/hotel-rates?id=${id}`, {
+        method: 'DELETE'
+      });
+
+      if (currentHotel) {
+        await fetchRates(currentHotel.id);
+      }
+      // Rate deleted successfully - table will auto-update
+    } catch (error) {
+      console.error('Error deleting rate:', handleApiError(error));
+      alert(handleApiError(error));
+    }
+  }
+
+  const handleEditRate = (rate: HotelRate) => {
+    setEditingRate(rate)
+    setRateForm({
+      fromDate: rate.from_date,
+      toDate: rate.to_date,
+      roomType: rate.room_type,
+      mealPlan: rate.meal_plan,
+      single: rate.single.toString(),
+      double: rate.double.toString(),
+      triple: rate.triple.toString(),
+      quad: rate.quad.toString(),
+      cwb: rate.cwb.toString(),
+      cnb: rate.cnb.toString()
+    })
+    setRateMenuOpen(null)
+  }
+
+  const handleCloseRateDialog = () => {
+    setShowRateDialog(false);
+    setCurrentHotel(null);
+    setRates([]);
+    setEditingRate(null);
+    setRateError(null);
+    setRateForm({
+      fromDate: '',
+      toDate: '',
+      roomType: '',
+      mealPlan: 'APAI',
+      single: '',
+      double: '',
+      triple: '',
+      quad: '',
+      cwb: '',
+      cnb: ''
+    });
   }
 
   const filteredHotels = hotels.filter(hotel =>
@@ -346,7 +529,12 @@ const Hotels: React.FC = () => {
                           <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
                             <span className="text-xs text-gray-500">🏨</span>
                           </div>
-                          <span className="truncate">{hotel.name}</span>
+                          <button 
+                            onClick={() => openRateDialog(hotel)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline truncate text-left"
+                          >
+                            {hotel.name}
+                          </button>
                         </div>
                       </td>
                       <td className="px-3 py-4 text-sm text-gray-900">
@@ -571,10 +759,13 @@ const Hotels: React.FC = () => {
                           ✓ File selected: {fileName}
                         </div>
                         <div className="w-20 h-20 border border-gray-300 rounded-md overflow-hidden">
-                          <img 
+                          <Image 
                             src={URL.createObjectURL(selectedFile)} 
                             alt="Preview" 
-                            className="w-full h-full object-cover"
+                            className="object-cover"
+                            fill
+                            sizes="80px"
+                            priority
                           />
                         </div>
                       </div>
@@ -658,6 +849,242 @@ const Hotels: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Rate Management Dialog */}
+      {showRateDialog && currentHotel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <ErrorBoundary>
+            <div className="bg-white rounded-lg shadow-xl w-[1200px] max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Update Price</h2>
+              <button
+                onClick={handleCloseRateDialog}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto">
+              {/* Hotel Name */}
+              <div className="mb-4">
+                <p className="text-sm font-bold text-gray-900">{currentHotel.name}</p>
+              </div>
+
+              {/* Rate Form */}
+              <div className="mb-6">
+                <div className="grid grid-cols-12 gap-2 mb-2">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">From Date</label>
+                    <Input
+                      type="date"
+                      value={rateForm.fromDate}
+                      onChange={(e) => setRateForm({...rateForm, fromDate: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">To</label>
+                    <Input
+                      type="date"
+                      value={rateForm.toDate}
+                      onChange={(e) => setRateForm({...rateForm, toDate: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">Room Type</label>
+                    <select
+                      className="w-full h-8 px-2 border border-gray-300 rounded text-sm"
+                      value={rateForm.roomType}
+                      onChange={(e) => setRateForm({...rateForm, roomType: e.target.value})}
+                    >
+                      <option value="">Select</option>
+                      {roomTypes.map((rt) => (
+                        <option key={rt.id} value={rt.name}>{rt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">Meal Plan</label>
+                    <select
+                      className="w-full h-8 px-2 border border-gray-300 rounded text-sm"
+                      value={rateForm.mealPlan}
+                      onChange={(e) => setRateForm({...rateForm, mealPlan: e.target.value})}
+                    >
+                      {mealPlans.map((mp, idx) => (
+                        <option key={idx} value={mp}>{mp}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-600 mb-1">Single</label>
+                    <Input
+                      type="number"
+                      value={rateForm.single}
+                      onChange={(e) => setRateForm({...rateForm, single: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-600 mb-1">Double</label>
+                    <Input
+                      type="number"
+                      value={rateForm.double}
+                      onChange={(e) => setRateForm({...rateForm, double: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className=" lasang block text-xs text-gray-600 mb-1">Triple</label>
+                    <Input
+                      type="number"
+                      value={rateForm.triple}
+                      onChange={(e) => setRateForm({...rateForm, triple: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-12 gap-2 mb-2">
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-600 mb-1">Quad</label>
+                    <Input
+                      type="number"
+                      value={rateForm.quad}
+                      onChange={(e) => setRateForm({...rateForm, quad: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-600 mb-1">CWB</label>
+                    <Input
+                      type="number"
+                      value={rateForm.cwb}
+                      onChange={(e) => setRateForm({...rateForm, cwb: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-600 mb-1">CNB</label>
+                    <Input
+                      type="number"
+                      value={rateForm.cnb}
+                      onChange={(e) => setRateForm({...rateForm, cnb: e.target.value})}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="col-span-9 flex items-end">
+                    <Button
+                      onClick={handleAddRate}
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rate List */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Rate List</h3>
+                {rateError ? (
+                  <div className="text-center py-4">
+                    <div className="text-red-600 text-sm">{rateError}</div>
+                    <button
+                      onClick={() => {
+                        setRateError(null);
+                        if (currentHotel) {
+                          fetchRates(currentHotel.id);
+                        }
+                      }}
+                      className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : loadingRates ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">From</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">To</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Room Type</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Meal Plan</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Single</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Double</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Triple</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quad</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">CWB</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">CNB</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(() => { console.log('🎨 Rendering rates table with', rates.length, 'rates:', rates); return null; })()}
+                        {rates.map((rate) => (
+                          <tr key={rate.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.from_date_formatted}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.to_date_formatted}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.room_type}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.meal_plan}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.single || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.double || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.triple || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.quad || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.cwb || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-gray-900">{rate.cnb || '-'}</td>
+                            <td className="px-3 py-2 relative">
+                              <button
+                                onClick={() => setRateMenuOpen(rateMenuOpen === rate.id ? null : rate.id)}
+                                className="text-gray-400 hover:text-gray-600"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                              {rateMenuOpen === rate.id && (
+                                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                  <button
+                                    onClick={() => handleEditRate(rate)}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteRate(rate.id)}
+                                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {rates.length === 0 && (
+                          <tr>
+                            <td colSpan={11} className="px-3 py-4 text-center text-sm text-gray-500">
+                              No rates added yet
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          </ErrorBoundary>
         </div>
       )}
     </div>

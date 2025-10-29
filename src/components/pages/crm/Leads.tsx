@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 
 interface Lead {
   id: string
@@ -17,7 +17,7 @@ interface Lead {
 }
 
 
-type FilterType = 'all' | 'Kashmir' | 'Ladakh' | 'Kerala' | 'Gokarna' | 'Meghalaya' | 'Mysore' | 'Singapore' | 'Hyderabad' | 'Bengaluru' | 'Manali'
+type FilterType = string
 
 const Leads: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -33,6 +33,29 @@ const Leads: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>((new Date().getMonth() + 1).toString())
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString())
   const [selectedDate, setSelectedDate] = useState<string>('all')
+  const [destinations, setDestinations] = useState<string[]>([])
+  const [loadingDestinations, setLoadingDestinations] = useState<boolean>(false)
+
+  // Fetch destinations
+  const fetchDestinations = useCallback(async () => {
+    try {
+      setLoadingDestinations(true)
+      const response = await fetch('/api/destinations')
+      if (response.ok) {
+        const data = await response.json()
+        // Extract name property from destination objects and remove duplicates
+        const uniqueDestinations = [...new Set((data.destinations || [])
+          .map(dest => dest?.name || dest)
+          .filter(Boolean)
+        )]
+        setDestinations(uniqueDestinations)
+      }
+    } catch (error) {
+      console.error('Error fetching destinations:', error)
+    } finally {
+      setLoadingDestinations(false)
+    }
+  }, [])
 
   // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState<boolean>(false)
@@ -79,7 +102,8 @@ const Leads: React.FC = () => {
     }
 
     fetchLeads()
-  }, [])
+    fetchDestinations()
+  }, [fetchDestinations])
 
   // Filter leads based on month, year, and date
   const getFilteredLeads = (): Lead[] => {
@@ -569,86 +593,27 @@ const Leads: React.FC = () => {
           >
             All ({leads.length})
           </button>
-          <button
-            onClick={() => setFilter('Kashmir')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Kashmir' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Kashmir ({leads.filter(l => l.destination === 'Kashmir').length})
-          </button>
-          <button
-            onClick={() => setFilter('Ladakh')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Ladakh' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Ladakh ({leads.filter(l => l.destination === 'Ladakh').length})
-          </button>
-          <button
-            onClick={() => setFilter('Kerala')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Kerala' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Kerala ({leads.filter(l => l.destination === 'Kerala').length})
-          </button>
-          <button
-            onClick={() => setFilter('Gokarna')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Gokarna' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Gokarna ({leads.filter(l => l.destination === 'Gokarna').length})
-          </button>
-          <button
-            onClick={() => setFilter('Meghalaya')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Meghalaya' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Meghalaya ({leads.filter(l => l.destination === 'Meghalaya').length})
-          </button>
-          <button
-            onClick={() => setFilter('Mysore')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Mysore' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Mysore ({leads.filter(l => l.destination === 'Mysore').length})
-          </button>
-          <button
-            onClick={() => setFilter('Singapore')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Singapore' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Singapore ({leads.filter(l => l.destination === 'Singapore').length})
-          </button>
-          <button
-            onClick={() => setFilter('Hyderabad')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Hyderabad' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Hyderabad ({leads.filter(l => l.destination === 'Hyderabad').length})
-          </button>
-          <button
-            onClick={() => setFilter('Bengaluru')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Bengaluru' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Bengaluru ({leads.filter(l => l.destination === 'Bengaluru').length})
-          </button>
-          <button
-            onClick={() => setFilter('Manali')}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              filter === 'Manali' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Manali ({leads.filter(l => l.destination === 'Manali').length})
-          </button>
+          {loadingDestinations ? (
+            <div className="flex items-center space-x-2 px-3 py-1">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              <span className="text-sm text-gray-500">Loading filters...</span>
+            </div>
+          ) : (
+            destinations.map((destination, index) => {
+              const count = leads.filter(l => l.destination === destination).length;
+              return (
+                <button
+                  key={`${destination}-${index}`}
+                  onClick={() => setFilter(destination)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    filter === destination ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {String(destination)} ({count})
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -1239,22 +1204,25 @@ const Leads: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Destination</label>
-                  <select
-                    value={newLead.destination}
-                    onChange={(e) => setNewLead({ ...newLead, destination: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="Kashmir">Kashmir</option>
-                    <option value="Ladakh">Ladakh</option>
-                    <option value="Kerala">Kerala</option>
-                    <option value="Gokarna">Gokarna</option>
-                    <option value="Meghalaya">Meghalaya</option>
-                    <option value="Mysore">Mysore</option>
-                    <option value="Singapore">Singapore</option>
-                    <option value="Hyderabad">Hyderabad</option>
-                    <option value="Bengaluru">Bengaluru</option>
-                    <option value="Manali">Manali</option>
-                  </select>
+                  {loadingDestinations ? (
+                    <div className="flex items-center space-x-2 h-8">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-sm text-gray-500">Loading destinations...</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={newLead.destination}
+                      onChange={(e) => setNewLead({ ...newLead, destination: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Select destination</option>
+                      {destinations.map((destination, index) => (
+                        <option key={`${destination}-${index}`} value={String(destination)}>
+                          {String(destination)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
+import Billing from './Billing'
 import { 
   MessageCircle, 
   Mail, 
@@ -55,9 +56,14 @@ interface QueryDetail {
   notes: string
 }
 
-const QueryDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+interface QueryDetailProps {
+  queryId?: string;
+  onBack?: () => void;
+  isEmployee?: boolean;
+}
+
+const QueryDetail: React.FC<QueryDetailProps> = ({ queryId, onBack, isEmployee = false }) => {
+  const router = useRouter()
   const [query, setQuery] = useState<QueryDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
@@ -79,15 +85,15 @@ const QueryDetail: React.FC = () => {
       try {
         setLoading(true)
         
-        if (!id) {
+        if (!queryId) {
           console.error('No query ID provided')
           setLoading(false)
           return
         }
 
-        console.log(`Fetching query data for ID: ${id} (attempt ${retryCount + 1})`)
+        console.log(`Fetching query data for ID: ${queryId} (attempt ${retryCount + 1})`)
 
-        const response = await fetch(`/api/leads/${id}`)
+        const response = await fetch(`/api/leads/${queryId}`)
         console.log('API Response status:', response.status)
         
         if (!response.ok) {
@@ -103,7 +109,7 @@ const QueryDetail: React.FC = () => {
           console.log('Raw lead data:', lead)
           
           const queryData: QueryDetail = {
-            id: parseInt(id),
+            id: parseInt(queryId || '0'),
             name: lead.name || 'Unknown',
             email: lead.email || 'No email',
             phone: lead.phone || 'No phone',
@@ -166,7 +172,7 @@ const QueryDetail: React.FC = () => {
         }
         
         const fallbackQuery: QueryDetail = {
-          id: parseInt(id || '0'),
+          id: parseInt(queryId || '0'),
           name: 'Error loading data',
           email: 'Error loading data',
           phone: 'Error loading data',
@@ -190,7 +196,7 @@ const QueryDetail: React.FC = () => {
     }
 
     fetchQuery()
-  }, [id, retryCount])
+  }, [queryId, retryCount])
 
   // Function to calculate total price from all events (same as Itineraries.tsx)
   const calculateTotalPrice = async (itineraryId: number): Promise<number> => {
@@ -323,10 +329,14 @@ const QueryDetail: React.FC = () => {
     }
   }, [query])
 
-  const [activeView, setActiveView] = useState<'details' | 'proposals'>('details')
+  const [activeView, setActiveView] = useState<'details' | 'proposals' | 'billing'>('details')
 
   const handleBackToQueries = () => {
-    navigate('/queries')
+    if (onBack) {
+      onBack()
+    } else {
+      router.push(isEmployee ? '/employee' : '/queries')
+    }
   }
 
   // Edit functions
@@ -364,13 +374,13 @@ const QueryDetail: React.FC = () => {
   }
 
   const saveClientChanges = async () => {
-    if (!query || !id) return
+    if (!query || !queryId) return
     
     try {
       setSaving(true)
       console.log('💾 Saving client changes:', editingClient)
       
-      const response = await fetch(`/api/leads/${id}`, {
+      const response = await fetch(`/api/leads/${queryId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -402,13 +412,13 @@ const QueryDetail: React.FC = () => {
   }
 
   const saveQueryChanges = async () => {
-    if (!query || !id) return
+    if (!query || !queryId) return
     
     try {
       setSaving(true)
       console.log('💾 Saving query changes:', editingQuery)
       
-      const response = await fetch(`/api/leads/${id}`, {
+      const response = await fetch(`/api/leads/${queryId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -476,83 +486,131 @@ const QueryDetail: React.FC = () => {
   return (
     <div className="h-full bg-background flex">
       {/* Left Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card transition-all duration-300`}>
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-6">
-            {!sidebarCollapsed && (
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-lg">Query Management</h2>
+      {!isEmployee ? (
+        <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card transition-all duration-300`}>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-6">
+              {!sidebarCollapsed && (
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <h2 className="font-semibold text-lg">Query Management</h2>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="p-1"
+              >
+                {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </Button>
+            </div>
+            
+            <nav className="space-y-1">
+              <div 
+                className={`flex items-center gap-3 px-3 py-2 ${activeView === 'details' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'} rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
+                onClick={() => setActiveView('details')}
+              >
+                <FileText className="w-4 h-4" />
+                {!sidebarCollapsed && <span className="text-sm font-medium">Query Details</span>}
               </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-1"
-            >
-              {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </Button>
+              
+              <div
+                className={`flex items-center gap-3 px-3 py-2 ${activeView === 'proposals' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'} rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
+                onClick={() => setActiveView('proposals')}
+              >
+                <File className="w-4 h-4" />
+                {!sidebarCollapsed && (
+                  <>
+                    <span className="text-sm">Proposals</span>
+                    <ChevronRight className="w-4 h-4 ml-auto" />
+                  </>
+                )}
+              </div>
+              
+              <div
+                className={`flex items-center gap-3 px-3 py-2 ${activeView === 'billing' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'} rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
+                onClick={() => setActiveView('billing')}
+              >
+                <CreditCard className="w-4 h-4" />
+                {!sidebarCollapsed && (
+                  <>
+                    <span className="text-sm">Billing</span>
+                    <ChevronRight className="w-4 h-4 ml-auto" />
+                  </>
+                )}
+              </div>
+              
+              <div className={`flex items-center gap-3 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
+                <FileCheck className="w-4 h-4" />
+                {!sidebarCollapsed && (
+                  <>
+                    <span className="text-sm">Guest Documents</span>
+                    <ChevronRight className="w-4 h-4 ml-auto" />
+                  </>
+                )}
+              </div>
+            </nav>
           </div>
-          
-          <nav className="space-y-1">
-            <div 
-              className={`flex items-center gap-3 px-3 py-2 ${activeView === 'details' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'} rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
-              onClick={() => setActiveView('details')}
-            >
-              <FileText className="w-4 h-4" />
-              {!sidebarCollapsed && <span className="text-sm font-medium">Query Details</span>}
-            </div>
-            
-            <div
-              className={`flex items-center gap-3 px-3 py-2 ${activeView === 'proposals' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'} rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
-              onClick={() => setActiveView('proposals')}
-            >
-              <File className="w-4 h-4" />
-              {!sidebarCollapsed && (
-                <>
-                  <span className="text-sm">Proposals</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </>
-              )}
-            </div>
-            
-            <div className={`flex items-center gap-3 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
-              <CreditCard className="w-4 h-4" />
-              {!sidebarCollapsed && (
-                <>
-                  <span className="text-sm">Billing</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </>
-              )}
-            </div>
-            
-            <div className={`flex items-center gap-3 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md cursor-pointer transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
-              <FileCheck className="w-4 h-4" />
-              {!sidebarCollapsed && (
-                <>
-                  <span className="text-sm">Guest Documents</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </>
-              )}
-            </div>
-          </nav>
         </div>
-      </div>
+      ) : null}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-card px-6 py-4">
           <div className="flex items-center justify-between">
-            <Button 
-              onClick={handleBackToQueries} 
-              variant="outline"
-              size="sm"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Queries
-            </Button>
+            <div className="flex items-center gap-4">
+              <Button 
+                onClick={handleBackToQueries} 
+                variant="outline"
+                size="sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Queries
+              </Button>
+
+              {isEmployee && (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setActiveView('details')
+                      router.push(`/queries/${queryId}${isEmployee ? '?view=employee' : ''}`)
+                    }}
+                    className={activeView === 'details' ? 'bg-primary text-white' : ''}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Details
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setActiveView('proposals')
+                      router.push(`/queries/${queryId}/proposals${isEmployee ? '?view=employee' : ''}`)
+                    }}
+                    className={activeView === 'proposals' ? 'bg-primary text-white' : ''}
+                  >
+                    <File className="w-4 h-4 mr-2" />
+                    Proposals
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setActiveView('billing')
+                      router.push(`/queries/${queryId}/billing${isEmployee ? '?view=employee' : ''}`)
+                    }}
+                    className={activeView === 'billing' ? 'bg-primary text-white' : ''}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Billing
+                  </Button>
+                </div>
+              )}
+            </div>
             
             <div className="flex items-center gap-2">
               <Button size="sm" className="bg-green-600 hover:bg-green-700">
@@ -563,14 +621,18 @@ const QueryDetail: React.FC = () => {
                 <Mail className="w-4 h-4 mr-2" />
                 Email
               </Button>
-              <Button variant="outline" size="sm">
-                <CheckSquare className="w-4 h-4 mr-2" />
-                Task
-              </Button>
-              <Button variant="outline" size="sm">
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
+              {!isEmployee && (
+                <>
+                  <Button variant="outline" size="sm">
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Task
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -586,6 +648,17 @@ const QueryDetail: React.FC = () => {
                 return <Proposals leadId={query.id} />
               })()}
             </div>
+          ) : activeView === 'billing' ? (
+            // Billing view
+            <Billing 
+              queryId={query.id} 
+              queryData={{
+                name: query.name,
+                email: query.email,
+                phone: query.phone,
+                destination: query.destination
+              }}
+            />
           ) : (
             <>
           {/* Query Header */}

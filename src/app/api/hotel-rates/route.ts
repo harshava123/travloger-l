@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { Client } from 'pg'
 import { headers } from 'next/headers'
 
-// GET all hotels
+// GET hotel rates
 export async function GET(request: Request) {
   const headersList = await headers()
   const contentType = headersList.get('content-type') || ''
@@ -11,6 +11,19 @@ export async function GET(request: Request) {
   if (contentType && !contentType.includes('application/json')) {
     return new NextResponse(
       JSON.stringify({ error: 'Invalid content type. Expected application/json' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    )
+  }
+
+  const url = new URL(request.url)
+  const hotelId = url.searchParams.get('hotelId')
+
+  if (!hotelId) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Hotel ID is required' }),
       {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -35,46 +48,59 @@ export async function GET(request: Request) {
   try {
     await client.connect()
     
-    // Auto-create hotels table if it doesn't exist
+    // Auto-create hotel_rates table if it doesn't exist
     await client.query(`
-      CREATE TABLE IF NOT EXISTS hotels (
+      CREATE TABLE IF NOT EXISTS hotel_rates (
         id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        destination TEXT NOT NULL,
-        category INTEGER DEFAULT 3,
-        price DECIMAL(10,2) DEFAULT 0,
-        address TEXT,
-        phone TEXT,
-        email TEXT,
-        icon_url TEXT,
-        status TEXT DEFAULT 'Active',
-        created_by TEXT DEFAULT 'Travloger.in',
+        hotel_id INTEGER NOT NULL REFERENCES hotels(id) ON DELETE CASCADE,
+        from_date DATE NOT NULL,
+        to_date DATE NOT NULL,
+        room_type TEXT NOT NULL,
+        meal_plan TEXT NOT NULL DEFAULT 'APAI',
+        single DECIMAL(10,2) DEFAULT 0,
+        double DECIMAL(10,2) DEFAULT 0,
+        triple DECIMAL(10,2) DEFAULT 0,
+        quad DECIMAL(10,2) DEFAULT 0,
+        cwb DECIMAL(10,2) DEFAULT 0,
+        cnb DECIMAL(10,2) DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_hotels_name ON hotels(name);
-      CREATE INDEX IF NOT EXISTS idx_hotels_destination ON hotels(destination);
-      CREATE INDEX IF NOT EXISTS idx_hotels_status ON hotels(status);
-      CREATE INDEX IF NOT EXISTS idx_hotels_category ON hotels(category);
+      CREATE INDEX IF NOT EXISTS idx_hotel_rates_hotel_id ON hotel_rates(hotel_id);
+      CREATE INDEX IF NOT EXISTS idx_hotel_rates_dates ON hotel_rates(from_date, to_date);
     `)
     
     const result = await client.query(`
-      SELECT id, name, destination, category, price, address, phone, email, 
-             icon_url, status, created_by,
-             TO_CHAR(created_at, 'DD-MM-YYYY') as date, created_at, updated_at
-      FROM hotels 
-      ORDER BY created_at DESC
-    `)
+      SELECT 
+        id, hotel_id, 
+        from_date,
+        to_date,
+        TO_CHAR(from_date, 'DD-MM-YYYY') as from_date_formatted,
+        TO_CHAR(to_date, 'DD-MM-YYYY') as to_date_formatted,
+        room_type,
+        meal_plan,
+        single,
+        double,
+        triple,
+        quad,
+        cwb,
+        cnb,
+        created_at,
+        updated_at
+      FROM hotel_rates 
+      WHERE hotel_id = $1
+      ORDER BY from_date DESC, room_type
+    `, [hotelId])
     
     return new NextResponse(
-      JSON.stringify({ hotels: result.rows }),
+      JSON.stringify({ rates: result.rows }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       }
     )
   } catch (error) {
-    console.error('Hotels GET error:', error)
+    console.error('Hotel rates GET error:', error)
     return new NextResponse(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {
@@ -87,7 +113,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST create new hotel
+// POST create new rate
 export async function POST(request: Request) {
   const headersList = await headers()
   const contentType = headersList.get('content-type') || ''
@@ -119,11 +145,14 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json()
-    const { name, destination, category, price, address, phone, email, iconUrl, status } = body
+    const { 
+      hotelId, fromDate, toDate, roomType, mealPlan,
+      single, double, triple, quad, cwb, cnb 
+    } = body
     
-    if (!name || !destination) {
+    if (!hotelId || !fromDate || !toDate || !roomType) {
       return new NextResponse(
-        JSON.stringify({ error: 'Hotel name and destination are required' }),
+        JSON.stringify({ error: 'Hotel ID, dates, and room type are required' }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
@@ -134,17 +163,36 @@ export async function POST(request: Request) {
     await client.connect()
     
     const result = await client.query(`
-      INSERT INTO hotels (name, destination, category, price, address, phone, email, icon_url, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, name, destination, category, price, address, phone, email, 
-                icon_url, status, created_by,
-                TO_CHAR(created_at, 'DD-MM-YYYY') as date, created_at, updated_at
-    `, [name, destination, category || 3, price || 0, address || '', phone || '', email || '', iconUrl || '', status || 'Active'])
+      INSERT INTO hotel_rates (
+        hotel_id, from_date, to_date, room_type, meal_plan,
+        single, double, triple, quad, cwb, cnb
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING 
+        id, hotel_id, 
+        from_date,
+        to_date,
+        TO_CHAR(from_date, 'DD-MM-YYYY') as from_date_formatted,
+        TO_CHAR(to_date, 'DD-MM-YYYY') as to_date_formatted,
+        room_type,
+        meal_plan,
+        single,
+        double,
+        triple,
+        quad,
+        cwb,
+        cnb,
+        created_at,
+        updated_at
+    `, [
+      hotelId, fromDate, toDate, roomType, mealPlan || 'APAI',
+      single || 0, double || 0, triple || 0, quad || 0, cwb || 0, cnb || 0
+    ])
     
     return new NextResponse(
       JSON.stringify({
-        hotel: result.rows[0],
-        message: 'Hotel created successfully'
+        rate: result.rows[0],
+        message: 'Rate created successfully'
       }),
       {
         status: 201,
@@ -152,7 +200,7 @@ export async function POST(request: Request) {
       }
     )
   } catch (error) {
-    console.error('Hotels POST error:', error)
+    console.error('Hotel rates POST error:', error)
     return new NextResponse(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {
@@ -165,7 +213,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT update hotel
+// PUT update rate
 export async function PUT(request: Request) {
   const headersList = await headers()
   const contentType = headersList.get('content-type') || ''
@@ -197,21 +245,14 @@ export async function PUT(request: Request) {
   
   try {
     const body = await request.json()
-    const { id, name, destination, category, price, address, phone, email, iconUrl, status } = body
+    const { 
+      id, hotelId, fromDate, toDate, roomType, mealPlan,
+      single, double, triple, quad, cwb, cnb 
+    } = body
     
-    if (!id) {
+    if (!id || !hotelId || !fromDate || !toDate || !roomType) {
       return new NextResponse(
-        JSON.stringify({ error: 'Hotel ID is required' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
-    }
-    
-    if (!name || !destination) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Hotel name and destination are required' }),
+        JSON.stringify({ error: 'Rate ID, hotel ID, dates, and room type are required' }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
@@ -222,19 +263,45 @@ export async function PUT(request: Request) {
     await client.connect()
     
     const result = await client.query(`
-      UPDATE hotels 
-      SET name = $1, destination = $2, category = $3, price = $4, 
-          address = $5, phone = $6, email = $7, icon_url = $8, status = $9,
-          updated_at = NOW()
-      WHERE id = $10
-      RETURNING id, name, destination, category, price, address, phone, email, 
-                icon_url, status, created_by,
-                TO_CHAR(created_at, 'DD-MM-YYYY') as date, created_at, updated_at
-    `, [name, destination, category || 3, price || 0, address || '', phone || '', email || '', iconUrl || '', status || 'Active', id])
+      UPDATE hotel_rates 
+      SET 
+        from_date = $1,
+        to_date = $2,
+        room_type = $3,
+        meal_plan = $4,
+        single = $5,
+        double = $6,
+        triple = $7,
+        quad = $8,
+        cwb = $9,
+        cnb = $10,
+        updated_at = NOW()
+      WHERE id = $11 AND hotel_id = $12
+      RETURNING 
+        id, hotel_id, 
+        from_date,
+        to_date,
+        TO_CHAR(from_date, 'DD-MM-YYYY') as from_date_formatted,
+        TO_CHAR(to_date, 'DD-MM-YYYY') as to_date_formatted,
+        room_type,
+        meal_plan,
+        single,
+        double,
+        triple,
+        quad,
+        cwb,
+        cnb,
+        created_at,
+        updated_at
+    `, [
+      fromDate, toDate, roomType, mealPlan || 'APAI',
+      single || 0, double || 0, triple || 0, quad || 0, cwb || 0, cnb || 0,
+      id, hotelId
+    ])
     
     if (result.rows.length === 0) {
       return new NextResponse(
-        JSON.stringify({ error: 'Hotel not found' }),
+        JSON.stringify({ error: 'Rate not found' }),
         {
           status: 404,
           headers: { 'Content-Type': 'application/json' }
@@ -244,8 +311,8 @@ export async function PUT(request: Request) {
     
     return new NextResponse(
       JSON.stringify({
-        hotel: result.rows[0],
-        message: 'Hotel updated successfully'
+        rate: result.rows[0],
+        message: 'Rate updated successfully'
       }),
       {
         status: 200,
@@ -253,7 +320,7 @@ export async function PUT(request: Request) {
       }
     )
   } catch (error) {
-    console.error('Hotels PUT error:', error)
+    console.error('Hotel rates PUT error:', error)
     return new NextResponse(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {
@@ -266,8 +333,22 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE hotel
+// DELETE rate
 export async function DELETE(request: Request) {
+  const headersList = await headers()
+  const contentType = headersList.get('content-type') || ''
+  
+  // Ensure we're receiving JSON
+  if (contentType && !contentType.includes('application/json')) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Invalid content type. Expected application/json' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    )
+  }
+
   const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
   
   if (!dbUrl) {
@@ -288,7 +369,7 @@ export async function DELETE(request: Request) {
     
     if (!id) {
       return new NextResponse(
-        JSON.stringify({ error: 'Hotel ID is required' }),
+        JSON.stringify({ error: 'Rate ID is required' }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
@@ -299,12 +380,12 @@ export async function DELETE(request: Request) {
     await client.connect()
     
     const result = await client.query(`
-      DELETE FROM hotels WHERE id = $1
+      DELETE FROM hotel_rates WHERE id = $1
     `, [id])
     
     if (result.rowCount === 0) {
       return new NextResponse(
-        JSON.stringify({ error: 'Hotel not found' }),
+        JSON.stringify({ error: 'Rate not found' }),
         {
           status: 404,
           headers: { 'Content-Type': 'application/json' }
@@ -313,14 +394,14 @@ export async function DELETE(request: Request) {
     }
     
     return new NextResponse(
-      JSON.stringify({ message: 'Hotel deleted successfully' }),
+      JSON.stringify({ message: 'Rate deleted successfully' }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       }
     )
   } catch (error) {
-    console.error('Hotels DELETE error:', error)
+    console.error('Hotel rates DELETE error:', error)
     return new NextResponse(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error occurred' }),
       {

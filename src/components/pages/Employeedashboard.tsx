@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import logo from '../../assets/images/logo.png'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Eye, FileText, CreditCard } from 'lucide-react'
+import QueryDetail from './QueryDetail'
 
 const Employeedashboard: React.FC = () => {
   const { user, logout } = useAuth()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,10 +61,72 @@ const Employeedashboard: React.FC = () => {
   const [expandedLeads, setExpandedLeads] = useState<Set<number>>(new Set())
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false)
   const [assignedLeads, setAssignedLeads] = useState<Array<any>>([])
-  const [activeSection, setActiveSection] = useState<'itineraries' | 'leads'>('itineraries')
+  const [activeSection, setActiveSection] = useState<'itineraries' | 'leads' | 'queries' | 'details'>('itineraries')
+  const [selectedQueryId, setSelectedQueryId] = useState<string | null>(null)
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [selectedItinerary, setSelectedItinerary] = useState<any>(null)
   const [showPaymentPage, setShowPaymentPage] = useState<boolean>(false)
+
+  // Query and Employee interfaces
+  interface Query {
+    id: string;
+    title: string;
+    description: string;
+    status: 'pending' | 'assigned' | 'resolved';
+    created_at: string;
+    assigned_employee_id?: string;
+    assigned_employee_name?: string;
+    assigned_employee_email?: string;
+  }
+
+  interface Employee {
+    id: string;
+    name: string;
+    email: string;
+    destination: string;
+  }
+
+  // Query states
+  const [queries, setQueries] = useState<Query[]>([])
+  const [loadingQueries, setLoadingQueries] = useState<boolean>(true)
+  const [queryError, setQueryError] = useState<string | null>(null)
+  const [selectedQuery, setSelectedQuery] = useState<Query | null>(null)
+  const [showQueryModal, setShowQueryModal] = useState<boolean>(false)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [loadingEmployees, setLoadingEmployees] = useState<boolean>(false)
+  const [queryFilter, setQueryFilter] = useState<'all' | 'pending' | 'assigned' | 'resolved'>('all')
+  
+  // Leads state
+  const [leads, setLeads] = useState<Array<{
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    destination: string;
+    travel_dates?: string;
+    number_of_travelers?: number;
+    status: string;
+  }>>([])
+
+  // Fetch leads assigned to the employee
+  const fetchLeads = React.useCallback(async () => {
+    if (!employeeId) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/leads?assignedTo=${employeeId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch leads');
+      }
+      const data = await response.json();
+      setLeads(data.leads || []);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch leads');
+    } finally {
+      setLoading(false);
+    }
+  }, [employeeId]);
 
   // Location/asset resolution state (to mirror Packages page card fields)
   interface HotelLocation { id: string; name: string; city: string }
@@ -133,6 +201,13 @@ const Employeedashboard: React.FC = () => {
     }
     fetchEmployeeData()
   }, [user?.email])
+
+  // Fetch leads when employeeId changes
+  useEffect(() => {
+    if (employeeId) {
+      fetchLeads()
+    }
+  }, [employeeId, fetchLeads])
 
   // Set up session tracking when employeeId is available
   useEffect(() => {
@@ -617,6 +692,20 @@ const Employeedashboard: React.FC = () => {
                   {assignedLeads.length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveSection('queries')}
+              className={`w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                activeSection === 'queries'
+                  ? 'bg-gray-300 text-gray-800'
+                  : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
+              }`}
+            >
+              <svg className={`h-6 w-6 ${activeSection === 'queries' ? 'text-gray-800' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Queries</span>
             </button>
           </div>
         </nav>
@@ -1389,6 +1478,118 @@ const Employeedashboard: React.FC = () => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Query Details Section */}
+            {activeSection === 'details' && selectedQueryId && (
+              <QueryDetail queryId={selectedQueryId} onBack={() => {
+                setActiveSection('queries')
+                setSelectedQueryId(null)
+              }} />
+            )}
+
+            {/* Queries Section */}
+            {activeSection === 'queries' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-12 w-12 bg-slate-800 rounded-xl flex items-center justify-center shadow-sm">
+                        <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-900">Customer Queries</h2>
+                        <p className="text-sm text-gray-600">View and manage customer inquiries</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                {loading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="relative">
+                      <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full animate-pulse"></div>
+                      </div>
+                    </div>
+                    <span className="ml-4 text-gray-600 font-medium">Loading queries...</span>
+                  </div>
+                ) : leads.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Queries Found</h3>
+                    <p className="text-gray-500">There are no customer queries assigned to you at the moment.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {leads.map(lead => (
+                      <div key={lead.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
+                            <p className="text-sm text-gray-600">{lead.email} • {lead.phone}</p>
+                          </div>
+                          <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            {lead.status || 'New'}
+                          </Badge>
+                        </div>
+                        <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-500">Destination</p>
+                            <p className="font-medium">{lead.destination}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Travel Dates</p>
+                            <p className="font-medium">{lead.travel_dates || 'Not specified'}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Travelers</p>
+                            <p className="font-medium">{lead.number_of_travelers || '0'} Pax</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex justify-end space-x-2">
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedQueryId(lead.id.toString())
+                              setActiveSection('details')
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                          <Button 
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            size="sm"
+                            onClick={() => router.push(`/queries/${lead.id}/proposals?view=employee`)}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View Proposals
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/queries/${lead.id}/billing?view=employee`)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Billing
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                </div>
               </div>
             )}
 
